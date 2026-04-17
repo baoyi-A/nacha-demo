@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NaCha Demo — BC-FLIM-Spectra</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #1e1e2e, #2d2d4e);
+    color: #fff; margin: 0; min-height: 100vh; padding: 20px;
+  }
+  .wrap { max-width: 900px; margin: 40px auto; }
+  .card {
+    background: rgba(255,255,255,0.05); padding: 40px; border-radius: 16px;
+    backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 20px;
+  }
+  h1 { margin: 0 0 8px; font-size: 32px; }
+  .sub { opacity: 0.7; margin-bottom: 32px; font-size: 15px; }
+  input, button {
+    width: 100%; padding: 14px; border-radius: 8px; font-size: 16px;
+    box-sizing: border-box; margin-bottom: 12px;
+  }
+  input {
+    border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;
+  }
+  input:focus { outline: none; border-color: #7c8fff; }
+  button {
+    border: none; background: #7c8fff; color: #fff; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: #6a7dff; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status {
+    padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;
+    margin-top: 16px; min-height: 20px; font-size: 14px;
+  }
+  .progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+  .bar { height: 100%; background: #7c8fff; width: 0%; transition: width 1s; }
+  .err { color: #ff6b6b; } .ok { color: #51cf66; }
+  .hidden { display: none; }
+  video { width: 100%; border-radius: 8px; background: #000; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .info-item { padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 14px; }
+  .info-item b { color: #7c8fff; display: block; margin-bottom: 4px; }
+  .big-btn { font-size: 18px; padding: 18px; margin-top: 20px; }
+  a { color: #7c8fff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Login -->
+  <div class="card" id="login-card">
+    <h1>🔬 NaCha Demo</h1>
+    <div class="sub">BC-FLIM-Spectra napari plugin · interactive demo for reviewers</div>
+    <input type="password" id="pw" placeholder="Access password" autofocus>
+    <button onclick="checkPw()">Continue</button>
+    <div class="status" id="login-status"></div>
+    <div class="sub" style="font-size:12px;margin-top:16px">If you don't have the access password, please contact the corresponding author.</div>
+  </div>
+
+  <!-- Landing (after login) -->
+  <div class="card hidden" id="land-card">
+    <h1>👋 Welcome!</h1>
+    <div class="sub">Watch the 5-min walkthrough, then launch the interactive napari demo.</div>
+
+    <video controls preload="metadata">
+      <source src="https://zenodo.org/records/17045806/files/Demo250804.mp4?download=1" type="video/mp4">
+      Your browser doesn't support HTML5 video.
+      <a href="https://zenodo.org/records/17045806/files/Demo250804.mp4?download=1">Download video</a>
+    </video>
+
+    <div class="info-grid">
+      <div class="info-item"><b>📦 Demo dataset</b>Pre-loaded: <code>/data/demo/Mix8-250319-Epi-3</code></div>
+      <div class="info-item"><b>📤 Upload your data</b>Drag files into the napari window</div>
+      <div class="info-item"><b>📄 Documentation</b><a href="https://github.com/baoyi-A/BC-FLI-Spectra" target="_blank">GitHub repository</a></div>
+      <div class="info-item"><b>🗂️ Zenodo records</b><a href="https://zenodo.org/records/16940026" target="_blank">Dataset</a> · <a href="https://zenodo.org/records/17045806" target="_blank">Video</a></div>
+    </div>
+
+    <button class="big-btn" id="launch-btn" onclick="launch()">▶ Launch napari Demo</button>
+    <div class="status" id="launch-status"></div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="sub" style="font-size:12px;margin-top:16px">First access may take up to 60 seconds while the demo server starts. Subsequent accesses are instant.</div>
+  </div>
+
+</div>
+
+<script>
+  const PASSWORD = 'nacha2026';
+  const WAKER_URL = 'https://waker-nacha-demo-qcrcvhzyxa.us-east-1.fcapp.run';
+  const VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+
+  function checkPw() {
+    const pw = document.getElementById('pw').value;
+    const s = document.getElementById('login-status');
+    if (pw !== PASSWORD) {
+      s.innerHTML = '<span class="err">✗ Wrong password</span>';
+      return;
+    }
+    sessionStorage.setItem('nacha_auth', '1');
+    document.getElementById('login-card').classList.add('hidden');
+    document.getElementById('land-card').classList.remove('hidden');
+  }
+
+  async function launch() {
+    const s = document.getElementById('launch-status');
+    const btn = document.getElementById('launch-btn');
+    const bar = document.getElementById('bar');
+
+    btn.disabled = true;
+    s.innerHTML = 'Waking demo server...';
+    let p = 0;
+    const t = setInterval(() => { p = Math.min(p + 1.5, 95); bar.style.width = p + '%'; }, 1000);
+
+    try {
+      const r = await fetch(WAKER_URL + '/wake', { method: 'POST' });
+      const j = await r.json();
+      s.innerHTML = j.status === 'Running' ? 'Server already running. Connecting...' : 'Server starting (' + j.status + ')...';
+    } catch (e) {
+      clearInterval(t);
+      s.innerHTML = '<span class="err">Error: ' + e.message + '</span>';
+      btn.disabled = false;
+      return;
+    }
+
+    // Poll VM directly (use image request trick to avoid CORS issues)
+    const start = Date.now();
+    while (Date.now() - start < 150000) {
+      await new Promise(r => setTimeout(r, 3000));
+      if (await vmReachable()) {
+        clearInterval(t);
+        bar.style.width = '100%';
+        s.innerHTML = '<span class="ok">✓ Ready! Redirecting...</span>';
+        setTimeout(() => window.location.href = VM_URL, 600);
+        return;
+      }
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      s.innerHTML = 'Starting... (' + elapsed + 's elapsed, usually ~40s)';
+    }
+    clearInterval(t);
+    s.innerHTML = '<span class="err">Timeout after 2.5 min. Please try again.</span>';
+    btn.disabled = false;
+  }
+
+  async function vmReachable() {
+    // Use an image load as reachability probe (bypasses CORS)
+    return new Promise(resolve => {
+      const img = new Image();
+      const timeout = setTimeout(() => resolve(false), 4000);
+      img.onload = img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(true);  // either load or error means server responded
+      };
+      img.src = 'http://47.90.166.242:7860/favicon.ico?t=' + Date.now();
+    });
+  }
+
+  if (sessionStorage.getItem('nacha_auth') === '1') {
+    document.getElementById('login-card').classList.add('hidden');
+    document.getElementById('land-card').classList.remove('hidden');
+  }
+  document.getElementById('pw').addEventListener('keypress', e => { if (e.key === 'Enter') checkPw(); });
+</script>
+</body>
+</html>
