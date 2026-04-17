@@ -135,8 +135,11 @@
       if (await vmReachable()) {
         clearInterval(t);
         bar.style.width = '100%';
-        s.innerHTML = '<span class="ok">✓ Ready! Redirecting...</span>';
-        setTimeout(() => window.location.href = VM_URL, 600);
+        s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + VM_URL + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a>';
+        // Try auto-open (works if popup allowed)
+        try { window.open(VM_URL, '_blank'); } catch(e) {}
+        btn.disabled = false;
+        btn.textContent = '▶ Re-open Demo';
         return;
       }
       const elapsed = Math.round((Date.now() - start) / 1000);
