@@ -148,15 +148,14 @@
   }
 
   async function vmReachable() {
-    // Use an image load as reachability probe (bypasses CORS)
+    // Probe the app.js endpoint that noVNC serves — only exists if container proxied correctly
     return new Promise(resolve => {
       const img = new Image();
       const timeout = setTimeout(() => resolve(false), 4000);
-      img.onload = img.onerror = () => {
-        clearTimeout(timeout);
-        resolve(true);  // either load or error means server responded
-      };
-      img.src = 'http://47.90.166.242:7860/favicon.ico?t=' + Date.now();
+      img.onload = () => { clearTimeout(timeout); resolve(true); };
+      img.onerror = () => { clearTimeout(timeout); resolve(false); };
+      // Use a small static image from noVNC that only exists when container is ready
+      img.src = 'http://47.90.166.242:7860/app/images/favicon.ico?t=' + Date.now();
     });
   }
 
