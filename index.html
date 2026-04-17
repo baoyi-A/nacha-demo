@@ -158,7 +158,7 @@
       img.onload = () => { clearTimeout(timeout); resolve(true); };
       img.onerror = () => { clearTimeout(timeout); resolve(false); };
       // Use a small static image from noVNC that only exists when container is ready
-      img.src = 'http://47.90.166.242:7860/app/images/favicon.ico?t=' + Date.now();
+      img.src = 'http://47.90.166.242:7860/app/images/icons/novnc-ios-152.png?t=' + Date.now();
     });
   }
 
