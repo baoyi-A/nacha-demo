@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="googlebot" content="noindex, nofollow">
 <title>NaCha Demo — BC-FLIM-Spectra</title>
 <style>
   * { box-sizing: border-box; }
@@ -19,15 +21,9 @@
   }
   h1 { margin: 0 0 8px; font-size: 32px; }
   .sub { opacity: 0.7; margin-bottom: 32px; font-size: 15px; }
-  input, button {
+  button {
     width: 100%; padding: 14px; border-radius: 8px; font-size: 16px;
     box-sizing: border-box; margin-bottom: 12px;
-  }
-  input {
-    border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;
-  }
-  input:focus { outline: none; border-color: #7c8fff; }
-  button {
     border: none; background: #7c8fff; color: #fff; font-weight: 600; cursor: pointer;
   }
   button:hover { background: #6a7dff; }
@@ -39,7 +35,6 @@
   .progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 12px; overflow: hidden; }
   .bar { height: 100%; background: #7c8fff; width: 0%; transition: width 1s; }
   .err { color: #ff6b6b; } .ok { color: #51cf66; }
-  .hidden { display: none; }
   video { width: 100%; border-radius: 8px; background: #000; }
   .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
   .info-item { padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 14px; }
@@ -54,20 +49,9 @@
 <body>
 <div class="wrap">
 
-  <!-- Login -->
-  <div class="card" id="login-card">
+  <div class="card">
     <h1>🔬 NaCha Demo</h1>
     <div class="sub">BC-FLIM-Spectra napari plugin · interactive demo for reviewers</div>
-    <input type="password" id="pw" placeholder="Access password" autofocus>
-    <button onclick="checkPw()">Continue</button>
-    <div class="status" id="login-status"></div>
-    <div class="sub" style="font-size:12px;margin-top:16px">If you don't have the access password, please contact the corresponding author.</div>
-  </div>
-
-  <!-- Landing (after login) -->
-  <div class="card hidden" id="land-card">
-    <h1>👋 Welcome!</h1>
-    <div class="sub">Watch the 5-min walkthrough, then launch the interactive napari demo.</div>
 
     <video controls preload="metadata">
       <source src="https://github.com/baoyi-A/nacha-demo/releases/download/v1/SLIC_walkthrough.mp4" type="video/mp4">
@@ -91,21 +75,8 @@
 </div>
 
 <script>
-  const PASSWORD = 'nacha2026';
   const WAKER_URL = 'https://waker-nacha-demo-qcrcvhzyxa.us-east-1.fcapp.run';
   const VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
-
-  function checkPw() {
-    const pw = document.getElementById('pw').value;
-    const s = document.getElementById('login-status');
-    if (pw !== PASSWORD) {
-      s.innerHTML = '<span class="err">✗ Wrong password</span>';
-      return;
-    }
-    sessionStorage.setItem('nacha_auth', '1');
-    document.getElementById('login-card').classList.add('hidden');
-    document.getElementById('land-card').classList.remove('hidden');
-  }
 
   async function launch() {
     const s = document.getElementById('launch-status');
@@ -120,6 +91,12 @@
     try {
       const r = await fetch(WAKER_URL + '/wake', { method: 'POST' });
       const j = await r.json();
+      if (j.status && j.status.startsWith && j.status.startsWith('Error')) {
+        clearInterval(t);
+        s.innerHTML = '<span class="err">' + j.status + '</span>';
+        btn.disabled = false;
+        return;
+      }
       s.innerHTML = j.status === 'Running' ? 'Server already running. Connecting...' : 'Server starting (' + j.status + ')...';
     } catch (e) {
       clearInterval(t);
@@ -128,7 +105,6 @@
       return;
     }
 
-    // Poll VM directly (use image request trick to avoid CORS issues)
     const start = Date.now();
     while (Date.now() - start < 150000) {
       await new Promise(r => setTimeout(r, 3000));
@@ -136,7 +112,6 @@
         clearInterval(t);
         bar.style.width = '100%';
         s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + VM_URL + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a>';
-        // Try auto-open (works if popup allowed)
         try { window.open(VM_URL, '_blank'); } catch(e) {}
         btn.disabled = false;
         btn.textContent = '▶ Re-open Demo';
@@ -151,22 +126,14 @@
   }
 
   async function vmReachable() {
-    // Probe the app.js endpoint that noVNC serves — only exists if container proxied correctly
     return new Promise(resolve => {
       const img = new Image();
       const timeout = setTimeout(() => resolve(false), 4000);
       img.onload = () => { clearTimeout(timeout); resolve(true); };
       img.onerror = () => { clearTimeout(timeout); resolve(false); };
-      // Use a small static image from noVNC that only exists when container is ready
       img.src = 'http://47.90.166.242:7860/app/images/icons/novnc-ios-152.png?t=' + Date.now();
     });
   }
-
-  if (sessionStorage.getItem('nacha_auth') === '1') {
-    document.getElementById('login-card').classList.add('hidden');
-    document.getElementById('land-card').classList.remove('hidden');
-  }
-  document.getElementById('pw').addEventListener('keypress', e => { if (e.key === 'Enter') checkPw(); });
 </script>
 </body>
 </html>
