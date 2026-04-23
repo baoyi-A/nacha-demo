@@ -137,6 +137,11 @@
 
 <script>
   const WAKER_URL = 'https://waker-nacha-demo-qcrcvhzyxa.us-east-1.fcapp.run';
+
+  // Page-view beacon (fire-and-forget, for access logging)
+  (function sendBeacon(){
+    try { fetch(WAKER_URL + '/beacon', {method:'POST',keepalive:true,mode:'no-cors'}); } catch(e){}
+  })();
   const CPU_VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
   let pendingGpuIp = null;
 
