@@ -169,6 +169,12 @@
         const j = await r.json();
         clearInterval(t);
 
+        if (j.rate_limited) {
+          s.innerHTML = '<span class="warn">⏱ <b>Rate-limited (not an error)</b>: ' + (j.error || j.message) + '</span>';
+          btn.disabled = false;
+          return;
+        }
+
         if (j.ok) {
           pendingGpuIp = j.ip;
           bar.style.width = '90%';
@@ -208,6 +214,12 @@
     try {
       const r = await fetch(WAKER_URL + '/wake', { method: 'POST' });
       const j = await r.json();
+      if (j.rate_limited) {
+        clearInterval(t);
+        s.innerHTML = '<span class="warn">⏱ <b>Rate-limited (not an error)</b>: ' + j.message + '</span>';
+        btn.disabled = false;
+        return;
+      }
       if (j.status && j.status.startsWith && j.status.startsWith('Error')) {
         clearInterval(t);
         s.innerHTML = '<span class="err">' + j.status + '</span>';
