@@ -167,24 +167,26 @@
         if (j.ok) {
           pendingGpuIp = j.ip;
           bar.style.width = '90%';
+          const startedAt = Date.now();
           s.innerHTML = j.existing
-            ? '<span class="ok">Existing GPU session found. Waiting for readiness...</span>'
-            : '<span class="ok">GPU VM provisioning. Waiting for container to boot (~90s)...</span>';
-          // Poll GPU VM reachability
-          const deadline = Date.now() + 180000;
+            ? '<span class="ok">Existing GPU session found. Verifying…</span>'
+            : '<span class="ok">GPU VM provisioning (cold boot takes 2–4 min)…</span>';
+          // Poll GPU VM reachability up to 5 min
+          const deadline = Date.now() + 300000;
           while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 5000));
+            await new Promise(r => setTimeout(r, 3000));
             if (await reachable(j.ip)) {
               bar.style.width = '100%';
               s.innerHTML = '<span class="ok">✓ GPU VM ready</span>';
               showModal('modal-gpu-ready');
               return;
             }
-            s.innerHTML = `GPU VM booting... (${Math.round((Date.now() - deadline + 180000)/1000)}s elapsed)`;
+            const elapsed = Math.round((Date.now() - startedAt) / 1000);
+            s.innerHTML = `Booting… (${elapsed}s elapsed, usually ready by 120–180s)`;
           }
-          s.innerHTML = '<span class="err">GPU VM did not respond in 3 min. Check console or fall back.</span>';
-          document.getElementById('gpu-fail-reason').textContent = 'GPU VM booted but did not respond in time.';
-          showModal('modal-gpu-fail');
+          // Timeout — but VM might still come up in a few seconds. Offer manual retry.
+          s.innerHTML = '<span class="warn">⚠ VM booted but not reachable yet. Try opening the demo directly — it may be ready now.</span> <a href="http://' + j.ip + ':7860/vnc.html?autoconnect=1&password=nacha&resize=scale" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#ffd43b;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Try Opening GPU Demo</a>';
+          btn.disabled = false;
         } else {
           // GPU failed — offer fallback
           document.getElementById('gpu-fail-reason').textContent = 'Reason: ' + (j.error || 'Unknown');
