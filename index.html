@@ -34,21 +34,45 @@
   }
   .progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 12px; overflow: hidden; }
   .bar { height: 100%; background: #7c8fff; width: 0%; transition: width 1s; }
-  .err { color: #ff6b6b; } .ok { color: #51cf66; }
+  .err { color: #ff6b6b; } .ok { color: #51cf66; } .warn { color: #ffd43b; }
   video { width: 100%; border-radius: 8px; background: #000; }
   .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
   .info-item { padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 14px; }
   .info-item b { color: #7c8fff; display: block; margin-bottom: 4px; }
   .big-btn { font-size: 18px; padding: 18px; margin-top: 20px; }
+  .gpu-toggle {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: rgba(0,0,0,0.2); border-radius: 8px;
+    margin-top: 16px; cursor: pointer; user-select: none;
+  }
+  .gpu-toggle:hover { background: rgba(0,0,0,0.3); }
+  .gpu-toggle input { width: 18px; height: 18px; cursor: pointer; }
+  .gpu-label b { color: #7c8fff; }
+  .gpu-hint { font-size: 12px; opacity: 0.6; margin-top: 4px; }
   a { color: #7c8fff; text-decoration: none; }
   a:hover { text-decoration: underline; }
   code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
   @media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center; z-index: 999;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #2d2d4e; padding: 32px; border-radius: 16px; max-width: 500px;
+    border: 1px solid rgba(255,255,255,0.1); margin: 20px;
+  }
+  .modal h2 { margin-top: 0; font-size: 20px; }
+  .modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
+  .modal-buttons button { width: auto; flex: 1; margin: 0; }
+  .btn-secondary { background: #444; }
+  .btn-secondary:hover { background: #555; }
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <div class="card">
     <h1>🔬 NaCha Demo</h1>
     <div class="sub">BC-FLIM-Spectra napari plugin · interactive demo for reviewers</div>
@@ -60,34 +84,126 @@
     </video>
 
     <div class="info-grid">
-      <div class="info-item"><b>📦 Demo dataset</b>Pre-loaded: <code>/data/demo/Mix8-250319-Epi-3</code></div>
+      <div class="info-item"><b>📦 Demo dataset</b>Pre-loaded: <code>/data/demo/Mix16-N-P-260306-DCZ-2-1</code></div>
       <div class="info-item"><b>📤 Upload your data</b>Drag files into the napari window</div>
       <div class="info-item"><b>📄 Documentation</b><a href="https://github.com/baoyi-A/BC-FLI-Spectra" target="_blank">GitHub repository</a></div>
       <div class="info-item"><b>🗂️ Zenodo records</b><a href="https://zenodo.org/records/16940026" target="_blank">Dataset</a> · <a href="https://zenodo.org/records/17045806" target="_blank">Video</a></div>
     </div>
 
+    <label class="gpu-toggle">
+      <input type="checkbox" id="gpu-toggle">
+      <div>
+        <div class="gpu-label"><b>Enable GPU mode</b> (accelerated Cellpose segmentation &amp; fine-tuning)</div>
+        <div class="gpu-hint">
+          The GPU is an <b>NVIDIA Tesla T4</b> (16GB, ~1/3 the speed of a consumer RTX 3090 — expect 6–8&nbsp;s per 2048×2048 Cellpose inference). Suitable for demo-scale runs.<br>
+          Launching a GPU session takes <b>~3 minutes</b> to provision a fresh VM. Any uploads/edits made in the session are <b>erased</b> when it ends. If GPU is unavailable (stock / quota), you can continue on CPU with the same pre-computed outputs.
+        </div>
+      </div>
+    </label>
+
     <button class="big-btn" id="launch-btn" onclick="launch()">▶ Launch napari Demo</button>
     <div class="status" id="launch-status"></div>
     <div class="progress"><div class="bar" id="bar"></div></div>
-    <div class="sub" style="font-size:12px;margin-top:16px">First access may take up to 60 seconds while the demo server starts. Subsequent accesses are instant.</div>
+    <div class="sub" style="font-size:12px;margin-top:16px">First access may take up to 60 seconds while the demo server starts.</div>
   </div>
+</div>
 
+<!-- Modal: GPU session warning -->
+<div class="modal-overlay" id="modal-gpu-ready">
+  <div class="modal">
+    <h2>⚠️ Temporary GPU session</h2>
+    <p>Your GPU session is ready.</p>
+    <p>📌 <b>Hardware</b>: NVIDIA Tesla T4 16GB — ~3× slower than RTX 3090 class cards. Cellpose inference on 2048×2048 takes about 6–8 s (vs ~2 s on a 3090). Still usable for demo-scale data; speed is not the focus of this demo.</p>
+    <p>⚠️ <b>Any uploads, edits, or intermediate files you create will be discarded</b> when the session ends (after 30 min of inactivity). Download important outputs before closing the tab.</p>
+    <div class="modal-buttons">
+      <button onclick="confirmGpu()">Continue to GPU Demo</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: GPU unavailable, fallback to CPU -->
+<div class="modal-overlay" id="modal-gpu-fail">
+  <div class="modal">
+    <h2>⚠️ GPU is unavailable</h2>
+    <p id="gpu-fail-reason">The GPU instance could not be provisioned right now (stock or quota may be unavailable in this region).</p>
+    <p>You can continue on the <b>CPU demo</b>, which uses <b>pre-computed segmentation results</b> — the displayed outputs are the same as if the GPU step had run.</p>
+    <div class="modal-buttons">
+      <button onclick="fallbackCpu()">Continue on CPU</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <script>
   const WAKER_URL = 'https://waker-nacha-demo-qcrcvhzyxa.us-east-1.fcapp.run';
-  const VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+  const CPU_VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+  let pendingGpuIp = null;
+
+  function showModal(id) { document.getElementById(id).classList.add('show'); }
+  function closeModal() {
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+    document.getElementById('launch-btn').disabled = false;
+  }
 
   async function launch() {
+    const useGpu = document.getElementById('gpu-toggle').checked;
     const s = document.getElementById('launch-status');
     const btn = document.getElementById('launch-btn');
     const bar = document.getElementById('bar');
-
     btn.disabled = true;
-    s.innerHTML = 'Waking demo server...';
+    bar.style.width = '0%';
+
+    if (useGpu) {
+      s.innerHTML = 'Requesting GPU instance (may take ~2 minutes)...';
+      let p = 0;
+      const t = setInterval(() => { p = Math.min(p + 0.8, 90); bar.style.width = p + '%'; }, 1000);
+
+      try {
+        const r = await fetch(WAKER_URL + '/launch-gpu', { method: 'POST' });
+        const j = await r.json();
+        clearInterval(t);
+
+        if (j.ok) {
+          pendingGpuIp = j.ip;
+          bar.style.width = '90%';
+          s.innerHTML = j.existing
+            ? '<span class="ok">Existing GPU session found. Waiting for readiness...</span>'
+            : '<span class="ok">GPU VM provisioning. Waiting for container to boot (~90s)...</span>';
+          // Poll GPU VM reachability
+          const deadline = Date.now() + 180000;
+          while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 5000));
+            if (await reachable(j.ip)) {
+              bar.style.width = '100%';
+              s.innerHTML = '<span class="ok">✓ GPU VM ready</span>';
+              showModal('modal-gpu-ready');
+              return;
+            }
+            s.innerHTML = `GPU VM booting... (${Math.round((Date.now() - deadline + 180000)/1000)}s elapsed)`;
+          }
+          s.innerHTML = '<span class="err">GPU VM did not respond in 3 min. Check console or fall back.</span>';
+          document.getElementById('gpu-fail-reason').textContent = 'GPU VM booted but did not respond in time.';
+          showModal('modal-gpu-fail');
+        } else {
+          // GPU failed — offer fallback
+          document.getElementById('gpu-fail-reason').textContent = 'Reason: ' + (j.error || 'Unknown');
+          s.innerHTML = '<span class="warn">⚠ GPU unavailable — offering CPU fallback</span>';
+          showModal('modal-gpu-fail');
+        }
+      } catch (e) {
+        clearInterval(t);
+        s.innerHTML = '<span class="err">Request failed: ' + e.message + '</span>';
+        document.getElementById('gpu-fail-reason').textContent = 'Network error: ' + e.message;
+        showModal('modal-gpu-fail');
+      }
+      return;
+    }
+
+    // CPU flow (default)
+    s.innerHTML = 'Waking CPU demo server...';
     let p = 0;
     const t = setInterval(() => { p = Math.min(p + 1.5, 95); bar.style.width = p + '%'; }, 1000);
-
     try {
       const r = await fetch(WAKER_URL + '/wake', { method: 'POST' });
       const j = await r.json();
@@ -104,15 +220,14 @@
       btn.disabled = false;
       return;
     }
-
     const start = Date.now();
     while (Date.now() - start < 150000) {
       await new Promise(r => setTimeout(r, 3000));
-      if (await vmReachable()) {
+      if (await reachable('47.90.166.242')) {
         clearInterval(t);
         bar.style.width = '100%';
-        s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + VM_URL + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a>';
-        try { window.open(VM_URL, '_blank'); } catch(e) {}
+        s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + CPU_VM_URL + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a>';
+        try { window.open(CPU_VM_URL, '_blank'); } catch (e) {}
         btn.disabled = false;
         btn.textContent = '▶ Re-open Demo';
         return;
@@ -125,13 +240,28 @@
     btn.disabled = false;
   }
 
-  async function vmReachable() {
+  function confirmGpu() {
+    closeModal();
+    if (pendingGpuIp) {
+      const url = 'http://' + pendingGpuIp + ':7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+      window.open(url, '_blank');
+    }
+  }
+
+  async function fallbackCpu() {
+    closeModal();
+    document.getElementById('gpu-toggle').checked = false;
+    document.getElementById('launch-status').innerHTML = 'Falling back to CPU demo...';
+    launch();  // retry with CPU mode
+  }
+
+  async function reachable(ip) {
     return new Promise(resolve => {
       const img = new Image();
       const timeout = setTimeout(() => resolve(false), 4000);
       img.onload = () => { clearTimeout(timeout); resolve(true); };
       img.onerror = () => { clearTimeout(timeout); resolve(false); };
-      img.src = 'http://47.90.166.242:7860/app/images/icons/novnc-ios-152.png?t=' + Date.now();
+      img.src = `http://${ip}:7860/app/images/icons/novnc-ios-152.png?t=` + Date.now();
     });
   }
 </script>
