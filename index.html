@@ -142,7 +142,7 @@
   (function sendBeacon(){
     try { fetch(WAKER_URL + '/beacon', {method:'POST',keepalive:true,mode:'no-cors'}); } catch(e){}
   })();
-  const CPU_VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+  const CPU_VM_URL = 'http://47.90.166.242:7860/vnc.html?autoconnect=1&resize=scale&quality=3&compression=9';
   let pendingGpuIp = null;
 
   function showModal(id) { document.getElementById(id).classList.add('show'); }
@@ -180,7 +180,7 @@
           bar.style.width = '90%';
           // Show progress countdown for typical boot time (~90s for existing VM, ~180s for cold boot)
           const WAIT_TIME = j.existing ? 15 : 120;  // seconds
-          const url = 'http://' + j.ip + ':7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+          const url = 'http://' + j.ip + ':7860/vnc.html?autoconnect=1&resize=scale&quality=3&compression=9';
 
           for (let i = WAIT_TIME; i > 0; i--) {
             s.innerHTML = `<span class="ok">GPU VM starting — ${i}s remaining (usually ready by 60–180s)</span>`;
@@ -248,7 +248,7 @@
   function confirmGpu() {
     closeModal();
     if (pendingGpuIp) {
-      const url = 'http://' + pendingGpuIp + ':7860/vnc.html?autoconnect=1&password=nacha&resize=scale';
+      const url = 'http://' + pendingGpuIp + ':7860/vnc.html?autoconnect=1&resize=scale&quality=3&compression=9';
       window.open(url, '_blank');
     }
   }
