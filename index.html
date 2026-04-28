@@ -137,6 +137,9 @@
 
 <script>
   const WAKER_URL = 'https://waker-nacha-demo-qcrcvhzyxa.us-east-1.fcapp.run';
+  // CPU VM IP changes after each StopCharging/restart cycle. /wake returns the current
+  // demo_url; we use that instead of a hardcoded URL.
+  let CPU_DEMO_URL_DYNAMIC = null;
 
   // Page-view beacon (fire-and-forget, for access logging)
   (function sendBeacon(){
@@ -226,6 +229,8 @@
         btn.disabled = false;
         return;
       }
+      // /wake returns the current public IP — keep it for the link below
+      if (j.demo_url) CPU_DEMO_URL_DYNAMIC = j.demo_url;
       s.innerHTML = j.status === 'Running' ? 'Server already running. Connecting...' : 'Server starting (' + j.status + ')...';
     } catch (e) {
       clearInterval(t);
@@ -240,7 +245,8 @@
     }
     clearInterval(t);
     bar.style.width = '100%';
-    s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + CPU_VM_URL + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a> <span style="font-size:12px;opacity:0.7;margin-left:8px;">(if not loading, wait 20s and refresh)</span>';
+    const finalUrl = CPU_DEMO_URL_DYNAMIC || CPU_VM_URL;
+    s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + finalUrl + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a> <span style="font-size:12px;opacity:0.7;margin-left:8px;">(if not loading, wait 20s and refresh)</span>';
     btn.disabled = false;
     btn.textContent = '▶ Re-open Demo';
   }
