@@ -266,15 +266,34 @@
       btn.disabled = false;
       return;
     }
-    // Wait ~60s for CPU VM + container startup (can't reliably probe due to mixed-content)
-    for (let i = 60; i > 0; i--) {
-      s.innerHTML = `<span class="ok">CPU VM starting — ${i}s remaining</span>`;
-      await new Promise(r => setTimeout(r, 1000));
+    // Poll /check every 3s — FC server-side probes demo's HTTP (no mixed-content issue).
+    // Caps at 120s for safety. Updates UI as soon as demo is actually ready.
+    const ip = (CPU_DEMO_URL_DYNAMIC || '').match(/http:\/\/([^:]+)/)?.[1];
+    let ready = false;
+    if (ip) {
+      for (let i = 0; i < 40 && !ready; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const cr = await fetch(WAKER_URL + '/check?ip=' + ip);
+          const cj = await cr.json();
+          if (cj.ready) { ready = true; break; }
+        } catch (e) { /* keep polling */ }
+        const elapsed = (i+1)*3;
+        s.innerHTML = `<span class="ok">CPU VM starting — ${elapsed}s elapsed (probing...)</span>`;
+        bar.style.width = Math.min(elapsed * 100/60, 95) + '%';
+      }
+    } else {
+      // Fallback: no IP, just wait 60s
+      for (let i = 60; i > 0; i--) {
+        s.innerHTML = `<span class="ok">CPU VM starting — ${i}s remaining</span>`;
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
     clearInterval(t);
     bar.style.width = '100%';
     const finalUrl = CPU_DEMO_URL_DYNAMIC || CPU_VM_URL;
-    s.innerHTML = '<span class="ok">✓ Ready!</span> <a href="' + finalUrl + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a> <span style="font-size:12px;opacity:0.7;margin-left:8px;">(if not loading, wait 20s and refresh)</span>';
+    const readyMsg = ready ? '✓ Ready!' : '✓ Should be ready (probe timed out)';
+    s.innerHTML = '<span class="ok">' + readyMsg + '</span> <a href="' + finalUrl + '" target="_blank" style="display:inline-block;margin-left:8px;padding:8px 16px;background:#51cf66;color:#000;border-radius:6px;font-weight:600;text-decoration:none">→ Open Demo (new tab)</a> <span style="font-size:12px;opacity:0.7;margin-left:8px;">(if not loading, wait 20s and refresh)</span>';
     btn.disabled = false;
     btn.textContent = '▶ Re-open Demo';
   }
