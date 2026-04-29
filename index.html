@@ -90,6 +90,15 @@
       <div class="info-item"><b>🎬 Walkthrough video</b><a href="https://github.com/baoyi-A/nacha-demo/releases/download/v1/SLIC_walkthrough.mp4" target="_blank">Download MP4</a> (also plays above)</div>
     </div>
 
+    <div class="region-pick" style="margin:14px 0;padding:12px 14px;background:#1a1f2e;border-radius:6px">
+      <label for="region-select" style="display:block;font-weight:600;margin-bottom:6px">Server location (CPU demo)</label>
+      <select id="region-select" style="width:100%;padding:8px;background:#0d1117;color:#e0e6ed;border:1px solid #30363d;border-radius:4px;font-size:14px">
+        <option value="us-east-1">US East — Virginia (recommended for US/EU reviewers)</option>
+        <option value="cn-beijing">Beijing (recommended for China)</option>
+      </select>
+      <div style="font-size:12px;opacity:0.7;margin-top:6px">First boot in a region takes 60–90s. GPU mode is always us-east-1.</div>
+    </div>
+
     <label class="gpu-toggle">
       <input type="checkbox" id="gpu-toggle">
       <div>
@@ -215,7 +224,8 @@
     let p = 0;
     const t = setInterval(() => { p = Math.min(p + 1.5, 95); bar.style.width = p + '%'; }, 1000);
     try {
-      const r = await fetch(WAKER_URL + '/wake', { method: 'POST' });
+      const region = document.getElementById('region-select').value;
+      const r = await fetch(WAKER_URL + '/wake?region=' + encodeURIComponent(region), { method: 'POST' });
       const j = await r.json();
       if (j.rate_limited) {
         clearInterval(t);
